@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NIT Delhi Pathfinding</title>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Polyline Decorator (Arrows) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.polylinedecorator/1.7.0/leaflet.polylineDecorator.min.js"></script>
+
+    <!-- MapMyIndia -->
+    <script src="https://apis.mapmyindia.com/advancedmaps/v1/{{ map_key }}/map_load?v=1.3"></script>
+
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-main: #020617;
+            --bg-card: rgba(15, 23, 42, 0.9);
+            --accent: #38bdf8;
+            --text-main: #e5e7eb;
+            --text-muted: #9ca3af;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #020617;
+            color: var(--text-main);
+            font-family: "Poppins", sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .app-shell {
+            width: 100%;
+            max-width: 1500px;
+            background: rgba(15, 23, 42, 0.92);
+            border-radius: 18px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 0.85fr 2.15fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        #map {
+            min-height: 650px;
+            border-radius: 16px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            background: #0f172a;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.25);
+            font-size: 0.95rem;
+        }
+
+        optgroup {
+            font-weight: bold;
+            color: #fbbf24 !important;
+            background: #020617;
+        }
+
+        button {
+            background-image: linear-gradient(90deg, #38bdf8, #a855f7);
+            padding: 12px 18px;
+            color: #020617;
+            border-radius: 999px;
+            border: none;
+            font-weight: 600;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .logo-square {
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: transparent;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+        }
+
+        .logo-square img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .loader-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .loader-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .loader-spinner {
+            width: 55px;
+            height: 55px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <header style="margin-bottom: 20px; display:flex; align-items:center; gap:15px;">
+        <div class="logo-square">
+            <img src="{{ url_for('static', filename='nit_logo.png') }}">
+        </div>
+        <h1>NIT Delhi — Pathfinding <span style="opacity:.6;">Shortest Path</span></h1>
+    </header>
+
+    <main class="layout">
+
+        <!-- LEFT PANEL -->
+        <section class="panel">
+
+            <!-- START -->
+            <label>Start Location</label>
+            <select id="start">
+                <!-- hidden special option for current location -->
+                <option value="__user_location__" style="display:none;">Current Location</option>
+
+                <optgroup label="🍔 Food & Cafes">
+                    <option>Amul canteen</option>
+                    <option>Nit delhi cafeteria</option>
+                    <option>HK cafe</option>
+                </optgroup>
+
+                <optgroup label="🏫 Academics">
+                    <option>Mechanical department</option>
+                    <option>academic block 1</option>
+                </optgroup>
+
+                <optgroup label="🏫 Mini Campus Entrances">
+                    <option>Mini campus entrance 1</option>
+                    <option>Mini campus entrance 2</option>
+                    <option>Mini campus entrance 3</option>
+                    <option>Mini campus entrance 4</option>
+                </optgroup>
+
+                <optgroup label="🏠 Hostels & Residences">
+                    <option>boys hostel</option>
+                    <option>girls hostel</option>
+                    <option>phase 1 Boys hostel</option>
+                    <option>Teachers quarter</option>
+                    <option>director home</option>
+                </optgroup>
+
+                <optgroup label="🏛 Admin Area">
+                    <option>admin entrance 1</option>
+                    <option>admin entrance 2</option>
+                    <option>admin entrance 3</option>
+                    <option>admin entrance 4</option>
+                </optgroup>
+
+                <optgroup label="🎯 Sports Grounds">
+                    <option>football ground</option>
+                    <option>badminton court</option>
+                    <option>basketball court</option>
+                    <option>tennis court</option>
+                    <option>volleyball court (Boys)</option>
+                    <option>volleyball court (Girls)</option>
+                    <option>kabbadi court (Girls)</option>
+                    <option>kabaddi court (Boys)</option>
+                    <option>open air theatre</option>
+                </optgroup>
+
+                <optgroup label="🚗 Entrances & Transport">
+                    <option>Main Entrance 1</option>
+                    <option>Main Entrance 2</option>
+                    <option>parking 1</option>
+                    <option>parking 2</option>
+                    <option>Bus Stand</option>
+                </optgroup>
+
+                <optgroup label="📍 Landmarks">
+                    <option>temple</option>
+                    <option>fountain</option>
+                    <option>NIT fountain</option>
+                </optgroup>
+
+            </select>
+
+            <br><br>
+
+            <!-- END -->
+            <label>End Location</label>
+            <select id="end">
+
+                <optgroup label="🍔 Food & Cafes">
+                    <option>Amul canteen</option>
+                    <option>Nit delhi cafeteria</option>
+                    <option>HK cafe</option>
+                </optgroup>
+
+                <optgroup label="🏫 Academics">
+                    <option>Mechanical department</option>
+                    <option>academic block 1</option>
+                </optgroup>
+
+                <optgroup label="🏫 Mini Campus Entrances">
+                    <option>Mini campus entrance 1</option>
+                    <option>Mini campus entrance 2</option>
+                    <option>Mini campus entrance 3</option>
+                    <option>Mini campus entrance 4</option>
+                </optgroup>
+
+                <optgroup label="🏠 Hostels & Residences">
+                    <option>boys hostel</option>
+                    <option>girls hostel</option>
+                    <option>phase 1 Boys hostel</option>
+                    <option>Teachers quarter</option>
+                    <option>director home</option>
+                </optgroup>
+
+                <optgroup label="🏛 Admin Area">
+                    <option>admin entrance 1</option>
+                    <option>admin entrance 2</option>
+                    <option>admin entrance 3</option>
+                    <option>admin entrance 4</option>
+                </optgroup>
+
+                <optgroup label="🎯 Sports Grounds">
+                    <option>football ground</option>
+                    <option>badminton court</option>
+                    <option>basketball court</option>
+                    <option>tennis court</option>
+                    <option>volleyball court (Boys)</option>
+                    <option>volleyball court (Girls)</option>
+                    <option>kabbadi court (Girls)</option>
+                    <option>kabaddi court (Boys)</option>
+                    <option>open air theatre</option>
+                </optgroup>
+
+                <optgroup label="🚗 Entrances & Transport">
+                    <option>Main Entrance 1</option>
+                    <option>Main Entrance 2</option>
+                    <option>parking 1</option>
+                    <option>parking 2</option>
+                    <option>Bus Stand</option>
+                </optgroup>
+
+                <optgroup label="📍 Landmarks">
+                    <option>temple</option>
+                    <option>fountain</option>
+                    <option>NIT fountain</option>
+                </optgroup>
+
+            </select>
+
+            <br><br>
+
+            <label>Algorithm</label>
+            <select id="algo">
+                <option value="dijkstra">Dijkstra</option>
+            </select>
+
+            <!-- USE MY LOCATION BUTTON -->
+            <button onclick="useMyLocation()" style="margin-top:10px; background:#0ea5e9;">
+                📍 Use My Current Location
+            </button>
+
+            <!-- FIND PATH BUTTON -->
+            <button onclick="findRoute()">Find Path</button>
+
+            <div style="margin-top:10px; border:1px solid rgba(255,255,255,0.2); padding:10px; border-radius:12px;">
+                <pre id="output">Pick start & end.</pre>
+            </div>
+
+            <script id="node-pos" type="application/json">
+                {{ node_pos | tojson | safe }}
+            </script>
+
+        </section>
+
+        <!-- MAP -->
+        <section class="panel">
+            <div id="map"></div>
+        </section>
+
+    </main>
+</div>
+
+<!-- Loader -->
+<div id="loader" class="loader-overlay">
+    <div class="loader-spinner"></div>
+</div>
+
+<script>
+let map;
+let polyline;
+let startMarker = null;
+let endMarker = null;
+let arrowLayer = null;
+
+let NODE_POS = JSON.parse(document.getElementById("node-pos").textContent);
+
+// store user GPS here once fetched
+let userLocation = null;
+
+window.onload = () => {
+    if (window.MapmyIndia) {
+        map = new MapmyIndia.Map("map", {
+            center: [28.8165, 77.1329],
+            zoom: 17,
+            style: "vector_map",
+            zoomControl: true
+        });
+    } else {
+        map = L.map('map').setView([28.8165, 77.1329], 17);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    }
+};
+
+function toggleLoader(show) {
+    let el = document.getElementById("loader");
+    if (show) el.classList.add("visible");
+    else el.classList.remove("visible");
+}
+
+function clearMap() {
+    if (polyline) map.removeLayer(polyline);
+    if (startMarker) map.removeLayer(startMarker);
+    if (endMarker) map.removeLayer(endMarker);
+    if (arrowLayer) map.removeLayer(arrowLayer);
+}
+
+// Get user's current GPS and mark as start
+function useMyLocation() {
+    if (!navigator.geolocation) {
+        alert("Location not supported on this browser bro.");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+
+        userLocation = [lat, lon];
+
+        // Drop marker for user location
+        if (startMarker) map.removeLayer(startMarker);
+
+        startMarker = L.marker(userLocation, {
+            icon: L.icon({
+                iconUrl: "https://cdn-icons-png.flaticon.com/512/535/535239.png",
+                iconSize: [40, 40],
+                iconAnchor: [20, 40]
+            })
+        })
+        .addTo(map)
+        .bindPopup("<b>Your Current Location</b>")
+        .openPopup();
+
+        map.setView(userLocation, 17);
+
+        // set special start value so backend knows this is GPS-based
+        document.getElementById("start").value = "__user_location__";
+
+        alert("Your current location set as Start!");
+    }, err => {
+        console.error(err);
+        alert("Failed to get current location.");
+    });
+}
+
+async function findRoute() {
+    clearMap();
+    toggleLoader(true);
+    document.getElementById("output").innerText = "Finding path…";
+
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+
+    const res = await fetch("/api/route", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+            start, 
+            end, 
+            algorithm: "dijkstra",
+            userLocation: userLocation   // may be null if not using GPS
+        })
+    });
+
+    const data = await res.json();
+    toggleLoader(false);
+
+    if (!res.ok) {
+        document.getElementById("output").innerText = "Error: " + (data.error || "Unknown error");
+        return;
+    }
+
+    document.getElementById("output").innerText =
+        "PATH: " + data.display_path.join(" → ") +
+        "\nDISTANCE: " + data.cost.toFixed(2) + " m";
+
+    drawPath(data.path);
+}
+
+function drawPath(path) {
+    const coords = path.map(n => NODE_POS[n] || null).filter(Boolean);
+
+    if (coords.length === 0) {
+        document.getElementById("output").innerText += "\n(No coordinates found for path)";
+        return;
+    }
+
+    polyline = L.polyline(coords, { color: "cyan", weight: 6 }).addTo(map);
+
+    // START PIN
+    startMarker = L.marker(coords[0], {
+        icon: L.icon({
+            iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+            iconSize: [40, 40],
+            iconAnchor: [20, 40]
+        })
+    })
+    .addTo(map)
+    .bindPopup("<b>Start:</b> " + path[0]);
+
+    // END PIN
+    endMarker = L.marker(coords[coords.length - 1], {
+        icon: L.icon({
+            iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149060.png",
+            iconSize: [40, 40],
+            iconAnchor: [20, 40]
+        })
+    })
+    .addTo(map)
+    .bindPopup("<b>End:</b> " + path[path.length - 1]);
+
+    // ARROWS ALONG ROUTE (BLACK)
+    arrowLayer = L.polylineDecorator(polyline, {
+        patterns: [{
+            offset: "0%",
+            repeat: "4%",
+            symbol: L.Symbol.arrowHead({
+                pixelSize: 12,
+                polygon: false,
+                pathOptions: { color: "black", weight: 2 }
+            })
+        }]
+    }).addTo(map);
+
+    map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+}
+</script>
+
+</body>
+</html>
